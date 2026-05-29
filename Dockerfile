@@ -87,5 +87,24 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # docker_init.bash performs root-only bind-mount setup, then drops to hermeswebui
 # before starting the WebUI server. The production image does not ship sudo.
 USER root
-CMD ["/hermeswebui_init.bash"]
+# Switch to hermeswebui user for runtime
+USER hermeswebui
+
+# Default host/port; Railway will pass PORT, we map it to HERMES_WEBUI_PORT
+ENV HERMES_WEBUI_HOST=0.0.0.0
+ENV HERMES_WEBUI_PORT=8787
+ENV HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
+ENV HERMES_WEBUI_DEFAULT_WORKSPACE=/workspace
+
+EXPOSE 8787
+
+CMD ["bash", "-lc", "set -e \
+  && mkdir -p \"$HERMES_WEBUI_STATE_DIR\" \"$HERMES_WEBUI_DEFAULT_WORKSPACE\" \
+  && export PORT=\"${PORT:-$HERMES_WEBUI_PORT}\" \
+  && export HERMES_WEBUI_PORT=\"$PORT\" \
+  && cd /apptoo \
+  && uv venv venv \
+  && source venv/bin/activate \
+  && uv pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org \
+  && python server.py"]
 
