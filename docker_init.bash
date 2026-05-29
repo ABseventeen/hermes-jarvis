@@ -139,14 +139,23 @@ save_env() {
   env | sort > "$tosave"
 }
 
-load_env() {
-  tocheck=$1
-  overwrite_if_different=$2
-  ignore_list="${ENV_IGNORELIST}"
-  obfuscate_part="${ENV_OBFUSCATE_PART}"
-  if [ -f "$tocheck" ]; then
-    echo "-- Loading environment variables from $tocheck (overwrite existing: $overwrite_if_different) (ignorelist: $ignore_list) (obfuscate: $obfuscate_part)"
     while IFS='=' read -r key value; do
+      # Skip empty lines and comment lines
+      [ -z "$key" ] && continue
+      case "$key" in
+        \#*) continue ;;
+      esac
+
+      # Trim whitespace around key
+      key="${key#"${key%%[![:space:]]*}"}"
+      key="${key%"${key##*[![:space:]]}"}"
+
+      # Validate key as a POSIX shell variable name
+      if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo "  !! Skipping invalid env var name from $tocheck: '$key'" >&2
+        continue
+      fi
+
       doit=false
       # checking if the key is in the ignorelist
       for i in $ignore_list; do
@@ -178,9 +187,6 @@ load_env() {
         export "$key=$value"
       fi
     done < "$tocheck"
-  fi
-}
-
 chown_home_hermeswebui() {
   # macOS Docker bind mounts can expose hermes-agent git object packs as
   # read-only host files. The runtime only needs to read those existing objects;
