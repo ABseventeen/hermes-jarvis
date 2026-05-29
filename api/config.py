@@ -46,7 +46,10 @@ def _platform_default_hermes_home() -> Path:
 # ── Network config (env-overridable) ─────────────────────────────────────────
 # Railway/Heroku provide PORT; default to 0.0.0.0 if present to work out of the box
 HOST = os.getenv("HERMES_WEBUI_HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
-PORT = int(os.getenv("HERMES_WEBUI_PORT", os.getenv("PORT", "8787")))
+# Railway/Heroku/Render inject PORT; prefer it over HERMES_WEBUI_PORT so the
+# Dockerfile's hardcoded ENV HERMES_WEBUI_PORT=8787 doesn't shadow the
+# platform-assigned port.
+PORT = int(os.getenv("PORT", os.getenv("HERMES_WEBUI_PORT", "8787")))
 
 # ── TLS/HTTPS config (optional, env-overridable) ────────────────────────────
 TLS_CERT = os.getenv("HERMES_WEBUI_TLS_CERT", "").strip() or None
