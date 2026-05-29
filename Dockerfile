@@ -18,14 +18,14 @@ RUN if [ "A${BUILD_APT_PROXY:-}" != "A" ]; then \
 
 RUN apt-get update -y --fix-missing --no-install-recommends \
     && apt-get install -y --no-install-recommends \
-    apt-utils \
-    locales \
-    ca-certificates \
-    curl \
-    rsync \
-    openssh-client \
-    git \
-    xz-utils \
+       apt-utils \
+       locales \
+       ca-certificates \
+       curl \
+       rsync \
+       openssh-client \
+       git \
+       xz-utils \
     && apt-get upgrade -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -42,8 +42,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /apptoo
 
-# Create the unprivileged runtime user. The entrypoint starts as root only for
-# UID/GID alignment and filesystem preparation, then execs the server as this user.
+# Create the unprivileged runtime user and dirs
 RUN groupadd -g 1024 hermeswebui \
     && useradd -u 1024 -d /home/hermeswebui -g hermeswebui -G users -s /bin/bash -m hermeswebui \
     && mkdir -p /app /uv_cache /workspace \
@@ -51,6 +50,7 @@ RUN groupadd -g 1024 hermeswebui \
     && chmod 0755 /home/hermeswebui \
     && chmod 1777 /app /uv_cache /workspace
 
+# We no longer use docker_init.bash as entrypoint, but keep it for reference if needed
 COPY --chmod=555 docker_init.bash /hermeswebui_init.bash
 
 RUN touch /.within_container
@@ -59,46 +59,31 @@ RUN touch /.within_container
 RUN rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/01proxy \
     && apt-get clean
 
-USER root
-
 # Pre-install uv system-wide so the container doesn't need internet access at runtime.
 # Installing as root places uv in /usr/local/bin, available to all users.
-# The init script will skip the download when uv is already on PATH.
+USER root
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
+# Copy app source
 COPY --chown=root:root . /apptoo
 
-# Bake the git version tag into the image so the settings badge works even
-# when .git is not present (it is excluded by .dockerignore).
-# CI passes: --build-arg HERMES_VERSION=$(git describe --tags --always)
-# Local builds that omit the arg get "unknown" as the fallback.
+# Bake the git version tag into the image
 ARG HERMES_VERSION=unknown
 RUN echo "__version__ = '${HERMES_VERSION}'" > /apptoo/api/_version.py
 
-# Default to binding all interfaces (required for container networking)
-ENV HERMES_WEBUI_HOST=0.0.0.0
-ENV HERMES_WEBUI_PORT=8787
-
-EXPOSE 8787
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8787/health || exit 1
-
-# docker_init.bash performs root-only bind-mount setup, then drops to hermeswebui
-# before starting the WebUI server. The production image does not ship sudo.
-USER root
 # Switch to hermeswebui user for runtime
 USER hermeswebui
 
+# Runtime defaults; can be overridden by env
 ENV HERMES_WEBUI_HOST=0.0.0.0
 ENV HERMES_WEBUI_PORT=8787
 ENV HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
 ENV HERMES_WEBUI_DEFAULT_WORKSPACE=/workspace
 
+# Runtime launcher script
 COPY --chown=hermeswebui:hermeswebui run-webui.sh /run-webui.sh
 RUN chmod +x /run-webui.sh
 
 EXPOSE 8787
 
 CMD ["/run-webui.sh"]
-
