@@ -90,21 +90,15 @@ USER root
 # Switch to hermeswebui user for runtime
 USER hermeswebui
 
-# Default host/port; Railway will pass PORT, we map it to HERMES_WEBUI_PORT
 ENV HERMES_WEBUI_HOST=0.0.0.0
 ENV HERMES_WEBUI_PORT=8787
 ENV HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
 ENV HERMES_WEBUI_DEFAULT_WORKSPACE=/workspace
 
+COPY --chown=hermeswebui:hermeswebui run-webui.sh /run-webui.sh
+RUN chmod +x /run-webui.sh
+
 EXPOSE 8787
 
-CMD ["bash", "-lc", "set -e \
-  && mkdir -p \"$HERMES_WEBUI_STATE_DIR\" \"$HERMES_WEBUI_DEFAULT_WORKSPACE\" \
-  && export PORT=\"${PORT:-$HERMES_WEBUI_PORT}\" \
-  && export HERMES_WEBUI_PORT=\"$PORT\" \
-  && cd /apptoo \
-  && uv venv venv \
-  && source venv/bin/activate \
-  && uv pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-  && python server.py"]
+CMD ["/run-webui.sh"]
 
