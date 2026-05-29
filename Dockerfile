@@ -65,7 +65,7 @@ USER root
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 # Copy app source
-COPY --chown=root:root . /apptoo
+COPY --chown=hermeswebui:hermeswebui . /apptoo
 
 # Bake the git version tag into the image
 ARG HERMES_VERSION=unknown
